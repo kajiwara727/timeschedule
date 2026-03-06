@@ -1,3 +1,5 @@
+// lib/screens/timetable_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../main.dart';
@@ -16,6 +18,7 @@ class TimetableScreen extends ConsumerWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            // ヘッダーや余白を除いた高さを計算
             final double cellHeight = (constraints.maxHeight - 88) / timetableState.maxPeriods;
             return Padding(
               padding: const EdgeInsets.all(8.0),
@@ -68,15 +71,31 @@ class TimetableCellWidget extends ConsumerWidget {
   final double cellHeight;
   final TimetableInfo? registeredClass;
 
-  const TimetableCellWidget({super.key, required this.day, required this.period, required this.cellHeight, this.registeredClass});
+  const TimetableCellWidget({
+    super.key, 
+    required this.day, 
+    required this.period, 
+    required this.cellHeight, 
+    this.registeredClass,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
+      onLongPress: registeredClass != null ? () => _showDeleteDialog(context, ref) : null,
       onTap: () async {
+        // 現在の設定状態を取得して選択画面に渡す
+        final state = ref.read(timetableProvider);
+        
         final result = await Navigator.of(context).push(MaterialPageRoute(
-          builder: (context) => ClassSelectionScreen(day: day, period: period),
+          builder: (context) => ClassSelectionScreen(
+            day: day, 
+            period: period,
+            state: state,
+          ),
         ));
+
+        // 戻り値に応じて状態を更新
         if (result == 'REMOVE') {
           ref.read(timetableProvider.notifier).removeClass(day, period);
         } else if (result is TimetableInfo) {
@@ -85,8 +104,44 @@ class TimetableCellWidget extends ConsumerWidget {
       },
       child: Container(
         height: cellHeight,
-        color: registeredClass != null ? Colors.blue.shade50 : null,
-        child: Center(child: Text(registeredClass?.name ?? '未登録', style: const TextStyle(fontSize: 10), textAlign: TextAlign.center)),
+        padding: const EdgeInsets.all(2.0),
+        color: registeredClass != null ? Colors.blue.shade50 : Colors.transparent,
+        child: Center(
+          child: Text(
+            registeredClass?.name ?? '未登録', 
+            style: TextStyle(
+              fontSize: registeredClass != null ? 10 : 12,
+              fontWeight: registeredClass != null ? FontWeight.bold : FontWeight.normal,
+              color: registeredClass != null ? Colors.black87 : Colors.grey,
+            ), 
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('授業の削除'),
+        content: Text('「${registeredClass!.name}」を未登録に戻しますか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () {
+              ref.read(timetableProvider.notifier).removeClass(day, period);
+              Navigator.pop(context);
+            },
+            child: const Text('削除する', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }
